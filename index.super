@@ -1,0 +1,6 @@
+<McT id="mc1"></McT>
+<script>
+    var m1 = mc1.exports;
+    m1.pushState({a:1},null,`<Page>a</Page>`);
+    m1.goto({a:1});
+</script>
