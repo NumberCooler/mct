@@ -1,0 +1,18 @@
+<McT id="mc1"></McT>
+<script>
+    var m1 = mc1.exports;
+    m1.pushState({a:1},null,`<Page>a</Page>`);
+    m1.goto({a:1});
+</script>
+<McT id="mc2"></McT>
+<script>
+    var m2 = mc2.exports;
+    m2.pushState({a:":number"},function() { return this.a >= 10; },`<Page>a</Page>`);
+    m2.goto({a:20});
+</script>
+<McT id="mc3"></McT>
+<script>
+    var McT = mc3.exports;
+    McT.pushState({title:":string"},function() { return this.title == "McT"; },`<Page>a</Page>`);
+    McT.goto({title:"McT"});
+</script>
