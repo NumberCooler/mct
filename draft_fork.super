@@ -1,0 +1,145 @@
+<script>
+    var extra = {};
+    for(var key in this.props) {
+        extra[ key ] = this.props[key];
+        console.error(key,this.props[key]);
+        if(key == "id") {
+            delete extra[key];
+            continue;
+        }
+        if(key == "srcData") {
+            delete extra[key];
+            continue;
+        }
+        if(key == "src") {
+            delete extra[key];
+            continue;
+        }
+    }
+    this.extra = extra;
+    console.log(extra);
+</script>
+{{this.children()}}
+<script>
+    // should create ForkSys with auto sys.
+    
+    var self = this;
+    var extra = self.extra;
+    delete self.extra;
+    console.log(extra);
+    var obj = Class.create("WithEvents");
+
+    function build(has_selfie) {
+        var render = [];
+        var has_srcData = false;
+        var has_src = false;
+        console.log("EXTRA!",extra);
+        render.push("<Component id=\"proxy\"");
+        if("baseData" in extra) {
+            render.push(" srcData={{"+JSON.stringify(extra.baseData)+"}}");
+        } else if("baseSrc" in extra) {
+            render.push(" src={{"+JSON.stringify(extra.baseSrc)+"}}");
+        }
+        if("selfie" in extra && extra.selfie) {
+            render.push(" router={{this.extra.router}}")
+            has_selfie.value = true;
+        }
+        for(var key in extra) { // usage of bindedComponent
+            if(key == "baseSrc") continue;
+            if(key == "baseData") continue;
+            if(key == "router") continue;
+            render.push(" " + key + "={{this.extra[" + JSON.stringify(key)+"]}}");
+        }
+        render.push(">");
+        // print children of binded (aka parent).
+        var pc = $childrenTarget.$.elementGetPreChildren() ;
+        if(pc!=null && pc!=undefined) {
+            render.push(pc); 
+        }
+        render.push("</Component>");
+        for(var key in extra) { // usage of bindedComponent
+            render.push("<script>console.log(\"EXTRA-X\",this.extra[" + JSON.stringify(key) + "]);</" + "script>");
+        }
+        console.log(render.join(""));
+        return render;
+    }
+    
+    obj.extra = extra;
+    obj.proxyed = null;
+    obj.schema = null;
+    obj.setChildren = function(data) {
+        $childrenTarget.$.elementSetPreChildren(data);
+    }
+    var x = 100;
+    $childrenTarget.$.on("elementChildren",(code,change)=>{  // first load, get default children.
+        var has_selfie = { value : false };
+        var code2 = build(has_selfie).join("");
+        console.log("elementChildren",code2);
+        if(has_selfie.value) {
+            extra.router = obj;
+        } else {
+            if("router" in extra) delete extra.router;
+        }
+        $childrenTarget.$.elementsClear(); // redundant.
+        //alert( "(>>)"+code+"(>>)"+$childrenTarget.$.elementGetPreChildren()+"(>>)"+code2+"(>>)"+JSON.stringify(extra)); 
+        change( code2, extra, (schema)=>{
+            obj.schema = schema;
+            obj.proxyed = { el : schema.el.proxy, $ : schema.$.proxy, exports : schema.exports.proxy };
+        } );
+        return true;
+    });
+    obj.reload = async function(context) { // the father context if children may have the same context, only on reload (the first fill do not have the context)
+        var code = "";
+        var c = null;
+        try {
+            var has_module = false;
+            var module_backup = null;
+            if(context) {
+                if("module" in context) {
+                    //alert("has module");
+                    has_module = true;
+                    module_backup = context.module;
+                }
+            } else {
+                context = { children : function(str) { return "<Component id='$childrenTarget'>"+str+"</Component>"; }, module : { exports : {} } };
+            }
+            $childrenTarget.$.elementsClear(); // redundant.
+            var has_selfie = { value : false };
+            var b = build(has_selfie).join("");
+            console.log("reload",b);
+            if(has_selfie.value) {
+                extra.router = obj;
+            } else {
+                if("router" in extra) delete extra.router;
+            }
+            context.extra = extra;
+            code = b;
+            c = context;
+            var schema = await $childrenTarget.$.elementSetPacketAsync(b,{
+                context : context
+            });
+            //console.error("context of children",context);
+            if(has_module) {
+                context.module = module_backup;
+            }
+            obj.proxyed = { el : schema.el.proxy, $ : schema.$.proxy, exports : schema.exports.proxy };
+            obj.schema = schema;
+            return {
+                schema,
+                exports : schema.exports.proxy
+            };
+        } catch(e) {
+            console.error(code);
+            console.error(c);
+            alert("error on reload:"+e.message);
+            throw new Error("reload");
+        }
+    };
+    
+    //await obj.reload();
+    
+    // no access to own schema, so obj.schema does not exists until reload
+    //await obj.reload(); // as a window, if you have control over extra pointer and other private data of target.
+    console.error(obj);
+    this.module.exports = obj;
+</script>
