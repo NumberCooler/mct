@@ -1,0 +1,447 @@
+<script>
+    var nav = {
+        boot : true,
+        items : [],
+        ref : { 
+            value : null 
+        },
+        bind : null,
+        events : Class.create("WithEvents"),
+        history : Class.create("WithArray"),
+        children : "",
+        reset : {a:0}
+    };
+    this.nav = nav;
+
+    /*
+        use attribute links to pass components or interfaces from top level context to children and states.
+        get throught extra of fork
+        this allows comm with other components. if previous loaded than navigator.
+    */
+    this.sys = this.props.sys;
+    this.emptyTemplate = `
+        <`+`script>
+        var self = this;
+        var obj_fork = Class.create("WithEvents");
+        obj_fork.goto = async function(resource_location,sent_data) {
+            await obj_fork.emit("goto",[obj_fork, resource_location,sent_data]);
+        }
+        obj_fork.boot = function() {
+            obj_fork.goto(${JSON.stringify(nav.reset)});
+        }
+        this.goto = async function(resource_location,sent_data) {
+            await obj_fork.emit("goto",[obj_fork, resource_location,sent_data]);
+        }
+        module.exports = obj_fork;
+        </`+`script>
+    `;
+    console.log(this.emptyTemplate);
+    this.main = `
+        <Fork id="fork" baseData={{this.emptyTemplate}} selfie={{true}} sys={{this.sys}}></Fork>
+    `;
+    if("links" in this.props) {
+        this.main=`<Fork id="fork" baseData={{this.emptyTemplate}} selfie={{true}} sys={{this.sys}} links={{this.props.links}}></Fork>`
+    }
+</script>
+{{this.main}}
+{{this.children()}}
+<script>
+    //capture basic children, blocks, and set on fork
+    var nav = this.nav;
+    delete this.nav;
+var self = this;
+
+
+function ObjEqual(a,b) { // b is pattern, a is instance
+    var ta = Object.prototype.toString.apply(a);
+    var tb = Object.prototype.toString.apply(b);
+    if(tb == "[object String]") {
+        if(b == ":string") {
+            return ta == tb;
+        } else if(b == ":number") {
+            return ta == "[object Number]";
+        } else if(b == ":array") {
+            return ta == "[object Array]";
+        } else if(b == ":object") {
+            return ta == "[object Object]";
+        } else if(b == ":date") {
+            return ta == "[object Date]";
+        } else if(b == ":function") {
+            return ta == "[object Function]" || ta == "[object AsyncFunction]";
+        } else if(b == ":generator") {
+            return ta == "[object GeneratorFunction]" || ta == "[object AsyncGeneratorFunction]";
+        } else if(b == ":regexp") {
+            return ta == "[object RegExp]";
+        } else if(b.indexOf(":")==0) {
+            return ta == "[object " + b.substring(1) + "]";
+        }
+    }
+    if(ta!=tb) return false;
+    if(ta == "[object Number]" || tb == "[object String]") return a==b;
+
+    if(ta == "[object Array]") {
+        if(a.length != b.length) return false;
+        for(var x = 0; x < a.length;x++) {
+            if(!ObjEqual(a[x],b[x])) return false;
+        }
+        return true;
+    }
+    if(ta == "[object Object]") {
+        var ka = [];
+        var kb = [];
+        for(var key in a) ka.push(key);
+        for(var key in b) kb.push(key);
+        if(ka.length!=kb.length) return false;
+        for(var x = 0; x < ka.length;x++) {
+            var check = false;
+            for(var y = 0; y < kb.length;y++) {
+                if(ka[x] == kb[y]) {
+                    check = true;
+                    break;
+                }
+            }
+            if(!check) return false;
+        }
+        for(var x = 0; x < ka.length;x++) {
+            if(!ObjEqual( a[ ka[x] ],b[ ka[x] ] )) return false;
+        }
+        return true;
+    }
+    throw new Error("not implemented.");
+}
+
+function ObjEqual2(a,b) { // no loops
+    var ta = Object.prototype.toString.apply(a);
+    var tb = Object.prototype.toString.apply(b);
+    if(ta!=tb) return false;
+    if(ta == "[object Number]" || ta == "[object String]") return a==b;
+    if(ta == "[object Array]") {
+        if(a.length != b.length) return false;
+        for(var x = 0; x < a.length;x++) {
+            if(!ObjEqual(a[x],b[x])) return false;
+        }
+        return true;
+    }
+    if(ta == "[object Object]") {
+        var ka = [];
+        var kb = [];
+        for(var key in a) ka.push(key);
+        for(var key in b) kb.push(key);
+        if(ka.length!=kb.length) return false;
+        for(var x = 0; x < ka.length;x++) {
+            var check = false;
+            for(var y = 0; y < kb.length;y++) {
+                if(ka[x] == kb[y]) {
+                    check = true;
+                    break;
+                }
+            }
+            if(!check) return false;
+        }
+        for(var x = 0; x < ka.length;x++) {
+            if(!ObjEqual( a[ ka[x] ],b[ ka[x] ] )) return false;
+        }
+        return true;
+    }
+    throw new Error("not implemented.");
+}
+
+nav.history.list = function(){
+    var ret = [];
+    for(var x = 0; x < nav.history.itemAmount();x++) {
+        ret.push( nav.history.itemGetAt(x)[0] );
+    }
+    return ret;
+};
+nav.ref.value = fork.exports.proxyed.exports;
+
+var used = [];
+
+function router() {
+    nav.ref.value.on("goto",async (cur, resource_location,sent_data) =>{
+        if(cur==undefined || cur == null) {
+            alert("error1");
+        }
+        if(resource_location == undefined || resource_location == null) {
+            alert("error2");
+        }
+        sent_data = sent_data || {};
+        var ref2 = {value:true};
+        if("timer" in sent_data) { clearTimeout(sent_data.timer); }
+        console.log("cur",cur.props);
+        console.log("data",sent_data);
+        console.log("next",resource_location);
+        await nav.events.emit("beforeload",[cur.props, sent_data, resource_location, ref2 ]);
+        if(!ref2.value) return;
+        console.error("Z1",fork.exports.extra);
+        for(var x = 0; x < used.length;x++) {
+            delete fork.exports.extra[used[x]];
+        }
+        for(var key in resource_location) {
+            var check1 = false;
+            for(var x = 0; x < used.length;x++) {
+                if(used[x] == key) {
+                    check1 = true;
+                    break;
+                }
+            }
+            if(!check1) used.push(key);
+            fork.exports.extra[key] = resource_location[key];
+        }
+        var bind = await fork.exports.reload(cur);
+        await nav.events.emit("afterload",[resource_location,bind]); // once?
+        console.error("at:",resource_location);
+        nav.ref.value = bind.exports;
+        nav.bind = bind;
+
+        //fork.schema.$.$childrenTarget.elementSetPacketAsync(code);
+        console.error("B123",bind);
+        //bind.$.$childrenTarget.elementSetPacketAsync(nav.children);
+        nav.history.itemPush([resource_location,sent_data]);
+        nav.boot = false;
+        router(); // rebind reload on new exports
+    });
+}
+router();
+var x = 0;
+nav.events.on("beforeload",async (cur,data,next,keep)=>{
+    console.error("beforeload");
+    var data = nav.build();
+    console.error("nav.build",x,data);
+    next.baseData = data;
+});
+nav.build = function() {
+    if(nav.items.length>0) {
+        var sb1 = [];
+        var sb2 = [];
+        for(var x = 0; x < nav.items.length;x++) {
+            var state = nav.items[x][0];
+            var predicate = nav.items[x][1];
+            var template = nav.items[x][2];
+            if(predicate) {
+                
+                sb1.push(
+                    "{{ ( this.Match(" + JSON.stringify(state) + ") && ( " + predicate.toString() + ").apply(this.props,[this]) ) ? " 
+                    + JSON.stringify(template) + ":''}}"
+                );
+            } else {
+                sb1.push(
+                    "{{ ( this.Match(" + JSON.stringify(state) + ") ) ? " 
+                    + JSON.stringify(template) + ":''}}"
+                );
+            }
+            
+        }
+        return `<script>
+    this.ObjEqual = function(a,b) { // b is pattern, a is instance
+        var ta = Object.prototype.toString.apply(a);
+        var tb = Object.prototype.toString.apply(b);
+        if(tb == "[object String]") {
+            if(b == ":string") {
+                return ta == tb;
+            } else if(b == ":number") {
+                return ta == "[object Number]";
+            } else if(b == ":array") {
+                return ta == "[object Array]";
+            } else if(b == ":object") {
+                return ta == "[object Object]";
+            } else if(b == ":date") {
+                return ta == "[object Date]";
+            } else if(b == ":function") {
+                return ta == "[object Function]" || ta == "[object AsyncFunction]";
+            } else if(b == ":generator") {
+                return ta == "[object GeneratorFunction]" || ta == "[object AsyncGeneratorFunction]";
+            } else if(b == ":regexp") {
+                return ta == "[object RegExp]";
+            } else if(b.indexOf(":")==0) {
+                return ta == "[object " + b.substring(1) + "]";
+            }
+        }
+        if(ta!=tb) return false;
+        if(ta == "[object Number]" || tb == "[object String]") return a==b;
+
+        if(ta == "[object Array]") {
+            if(a.length != b.length) return false;
+            for(var x = 0; x < a.length;x++) {
+                if(!ObjEqual(a[x],b[x])) return false;
+            }
+            return true;
+        }
+        if(ta == "[object Object]") {
+            var ka = [];
+            var kb = [];
+            for(var key in a) ka.push(key);
+            for(var key in b) kb.push(key);
+            if(ka.length!=kb.length) return false;
+            for(var x = 0; x < ka.length;x++) {
+                var check = false;
+                for(var y = 0; y < kb.length;y++) {
+                    if(ka[x] == kb[y]) {
+                        check = true;
+                        break;
+                    }
+                }
+                if(!check) return false;
+            }
+            for(var x = 0; x < ka.length;x++) {
+                if(!ObjEqual( a[ ka[x] ],b[ ka[x] ] )) return false;
+            }
+            return true;
+        }
+        throw new Error("not implemented.");
+    }
+    this.Match = (target)=>{
+        
+        for(var key in target) {
+            console.error("match!1",key)
+            console.log("target.key",key);
+            if(key in this.props) {
+                console.error("match!1",key,"in target and in props");
+                console.log("has in props");
+                if(!this.ObjEqual( this.props[key],target[key] )) return false;
+            } else {
+                console.error("match!1",key,"in target and not in props");
+                return false;
+            }
+        }
+        return true;
+    }
+    this.events = Class.create("WithEvents");
+    </`+`script>
+    ${sb1.join("\n\n\n\n")}
+    <script>
+                var self = this;
+                console.log(this);
+                var obj_fork = this.events;
+                obj_fork.goto = async function(resource_location,sent_data) {
+                    await obj_fork.emit("goto",[obj_fork, resource_location,sent_data]);
+                };
+                obj_fork.boot = function() {
+                    obj_fork.goto(${JSON.stringify(nav.reset)});
+                }
+                this.goto = async function(resource_location,sent_data) {
+                    await obj_fork.emit("goto",[obj_fork, resource_location,sent_data]);
+                }
+                module.exports = obj_fork;
+            </`+`script>`
+    } else {
+        return self.emptyTemplate;
+    }
+}
+console.error("A123",fork.schema);
+$childrenTarget.$.on("elementChildren",(code,change)=>{ // blocks children and pass to fork for next reload.
+    fork.exports.setChildren(code);
+    change( "", {}, (schema)=>{ } );
+    return true;
+});
+function clone(state) {
+    var cache = [];
+    function isin(obj) {
+        for(var x = 0; x < cache.length;x++) if(obj == caches[x][0]) return [true,x];
+        return [false,-1];
+    }
+    return (function cloneSO(obj) {
+        // Handle the 3 simple types, and null or undefined
+        if (null == obj || "object" != typeof obj) return obj;
+        // Handle Date
+        if (obj instanceof Date) {
+            var copy = new Date();
+            copy.setTime(obj.getTime());
+            return copy;
+        }
+        // Handle Array
+        if (obj instanceof Array) {
+            var r = isin(obj);
+            if(r[0]) return cache[r[1]][1];
+            var copy = [];
+            cache.push([obj,copy]);
+            for (var i = 0, len = obj.length; i < len; i++) {
+                copy[i] = cloneSO(obj[i]);
+            }
+            return copy;
+        }
+        // Handle Object
+        if (obj instanceof Object) {
+            var r = isin(obj);
+            if(r[0]) return cache[r[1]][1];
+            var copy = {};
+            cache.push([obj,copy]);
+            for (var attr in obj) {
+                if (obj.hasOwnProperty(attr)) copy[attr] = cloneSO(obj[attr]);
+            }
+            return copy;
+        }
+        throw new Error("Unable to copy obj! Its type isn't supported.");
+    })(state);
+}
+module.exports = {
+    history : nav.history,
+    pushState : function(state,predicate,space) {
+        nav.items.push([clone(state),predicate,space]);
+    },
+    unshiftState : function(state,predicate,space) {
+        nav.items.unshift([clone(state),predicate,space]);
+    },
+    popState : function() {
+        return nav.items.pop();
+    },
+    shiftState : function() {
+        return nav.items.shift();
+    },
+    findStates : function(points) { 
+        var sel = [];
+        for(var x = 0; x < nav.items.length;x++) {
+            for(var y = 0; y < arguments.length;y++) {
+                var check = true;
+                for(var key in nav.items[x]) {
+                    console.error("match!1",key);
+                    console.log("target.key",key);
+                    if(key in arguments[y]) {
+                        console.error("match!1",key,"in target and in props");
+                        console.log("has in props");
+                        if(!this.ObjEqual( arguments[y][key],target[key] )) {
+                            check = false;
+                            break;
+                        }
+                    } else {
+                        console.error("match!1",key,"in target and not in props");
+                        check = false;
+                        break;
+                    }
+                }
+                if(check) {
+                    sel.push(clone( nav.items[x]) );
+                    break;
+                }
+            }
+        }
+        return sel;
+    },
+    listStates : function() {
+        var ret = [];
+        for(var x = 0; x < nav.items.length;x++) {
+            ret.push( clone(nav.items[x][0]) );
+        }
+        return ret;
+    },
+    goBack : async function() {
+        if(nav.history.itemAmount()>1) {
+            nav.history.itemPop();
+            if(nav.history.itemAmount()>0) {
+                var item = nav.history.itemGetAt( nav.history.itemAmount() - 1);
+                await nav.ref.value.goto(item[0],{}); // dont resend data of user.
+                nav.history.itemPop(); // dont add a new without sent data
+            } else {
+                //await nav.ref.value.goto(nav.reset,{}); // dont resend data of user.    
+                //nav.boot = true;
+            }
+        }
+    },
+    goto : function(state,data) {
+        nav.ref.value.goto(state,data)
+    },
+    getResponse : function() {
+    },
+};
+
+</script>
